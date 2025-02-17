@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Website Builder ZIP Demo</title>
+  <!-- Include JSZip and FileSaver libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    #preview img { margin: 5px; border: 1px solid #ccc; width: 100px; }
+  </style>
+</head>
+<body>
+  <h1>Website Builder ZIP Demo</h1>
+  <p>Select multiple images:</p>
+  <input type="file" id="fileInput" multiple accept="image/*">
+  <div id="preview"></div>
+  <br>
+  <button id="downloadBtn">Download Website ZIP</button>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+
+    // Preview the selected images
+    fileInput.addEventListener('change', () => {
+      preview.innerHTML = "";
+      Array.from(fileInput.files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = document.createElement('img');
+          img.src = e.target.result;
+          preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    // Generate the ZIP file with folder structure and trigger download
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      if (fileInput.files.length === 0) {
+        alert("No images selected!");
+        return;
+      }
+      const zip = new JSZip();
+      const imagesFolder = zip.folder("images");
+
+      // Convert each file to a base64 string and add it to the "images" folder
+      const promises = Array.from(fileInput.files).map(file => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const base64Data = e.target.result.split(',')[1];
+            imagesFolder.file(file.name, base64Data, { base64: true });
+            resolve();
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      });
+
+      Promise.all(promises)
+        .then(() => {
+          // Build index.html content with relative image paths
+          let indexHTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>My Website</title>
+</head>
+<body>
+  <h1>Welcome to My Website</h1>
+  <div>`;
+          Array.from(fileInput.files).forEach(file => {
+            indexHTML += `<img src="images/${file.name}" style="width:200px; margin:10px;">\n`;
+          });
+          indexHTML += `</div>
+</body>
+</html>`;
+          
+          zip.file("index.html", indexHTML);
+          zip.generateAsync({ type: "blob" })
+            .then(content => {
+              saveAs(content, "website.zip");
+            })
+            .catch(err => {
+              console.error("ZIP generation error:", err);
+              alert("Error generating ZIP. See console for details.");
+            });
+        })
+        .catch(err => {
+          console.error("Error reading files:", err);
+          alert("Error reading files. See console for details.");
+        });
+    });
+  </script>
+</body>
+</html>
